@@ -1,0 +1,529 @@
+---
+title: "exercise-05"
+
+format: html
+
+editor: visual
+---
+
+Challenge 1
+
+```{r}
+library(tidyverse)
+library(dplyr)
+f<- "https://raw.githubusercontent.com/difiore/ada-datasets/main/IMDB-movies.csv"
+d<- read.csv(f, header=TRUE)
+d
+
+
+d_filt <- d |> 
+  filter(startYear >= 1920 & startYear <= 1979 & runtimeMinutes >= 60 & runtimeMinutes <= 180) |> 
+  mutate(decade = paste0(substr(startYear, 3, 3), "0s"))
+
+d_filt
+
+#Step 3
+gplot <- ggplot(data = d_filt, aes(x = d_filt$runtimeMinutes)) + geom_histogram(binwidth = 4, fill = "blue", color = "black") + facet_wrap(~decade) + labs(title = "Movie Runtimes by Decade", x = " Movie Runtime", y = "Count") +
+  theme_minimal()
+
+gplot
+
+#Step 4 Calculating Stats
+results <- d_filt |> group_by(decade) |> summarise(mean_R= mean(runtimeMinutes), sd_R= sd(runtimeMinutes))
+ 
+results
+
+
+
+#Step 5
+
+single_v <- d_filt |> group_by(decade) |> slice_sample(n=100)|> summarise(mean_R= mean(runtimeMinutes), sd_R= sd(runtimeMinutes))
+ single_v
+ 
+ 
+ 
+ #Step 6
+ 
+ single_v <- d_filt |> 
+  group_by(decade) |> 
+  slice_sample(n = 100) |>  
+  summarise(
+    mean_R = mean(runtimeMinutes, na.rm = TRUE),
+    sd_R = sd(runtimeMinutes, na.rm = TRUE),
+    SE_R = sd_R / sqrt(100)
+  )
+
+single_v
+
+
+#Step 7
+
+#Get the difference between samole mean and population mean 
+
+comparison <- left_join(single_v, results, by = "decade", suffix = c("_sample", "_pop"))
+
+comparison <- comparison |> 
+  mutate(Diff_mean = mean_R_sample - mean_R_pop)
+
+comparison
+
+#Sample SE vs Pop SE
+
+comparison <- comparison |> 
+  mutate(SE_pop = sd_R_pop / sqrt(100),
+         Diff_SE = SE_R - SE_pop)
+
+comparison
+
+
+#Step 8 
+library(tidyverse)
+library(dplyr)
+library(purrr)
+
+#sampling ditribution
+
+sample_d <- d_filt |> 
+  group_by(decade) |> 
+  summarise(
+    samples = list(rerun(1000, sample(runtimeMinutes, 100, replace = FALSE))),
+    .groups = 'drop'
+  ) |> 
+  unnest(cols = c(samples)) |> 
+  mutate(sample_mean = map_dbl(samples, mean))
+
+#Calculate the mean for each sample
+
+head(sample_d)
+
+#Step 9
+stats<-sample_d> 
+  group_by(decade) |> 
+  summarise(
+    mean_of_means = mean(sample_mean),  
+    std_error = sd(sample_mean))
+
+
+stats
+
+# Histograms of the sampling distributions of means for each decade
+ggplot(sample_d, aes(x = sample_mean)) + 
+  geom_histogram(binwidth = 2, fill = "red", color = "black", alpha = 0.7) + 
+  facet_wrap(~decade) + 
+  labs(title = "Sampling Distribution of Means by Decade", 
+       x = "Sample Mean", 
+       y = "Frequency") + 
+  theme_minimal()
+
+  #Answer: It has a bell-shaped/normal distribution
+  
+#Step 10
+#Standard error from first sample of 100 movies
+
+single_v <- d_filt |> 
+  group_by(decade) |> 
+  slice_sample(n = 100) |>  
+  summarise(
+    mean_R = mean(runtimeMinutes),
+    sd_R = sd(runtimeMinutes),
+    SE_R = sd_R / sqrt(100)
+  )
+single_v
+
+# Standard erro based on population standard deviation
+results <- results |> 
+  mutate(SE_population = sd_R / sqrt(100)) 
+
+results
+
+#Standard error from sampling distribution
+
+sample_d <- sample_d |> 
+  group_by(decade) |> 
+  summarise(SE_sampling_distribution = sd(mean_runtime))
+
+
+
+
+```
+
+Challenge 2
+
+```{r, echo=TRUE}
+
+#Step 1
+
+library(tidyverse)
+z <- "https://raw.githubusercontent.com/difiore/ada-datasets/main/zombies.csv"
+z<- read.csv(z, header= TRUE)
+
+
+#Step 2
+
+popn_stats <- data.frame(
+  Variable = c("Height", "Weight", "Age", "Zombies_Killed", "Years_of_Education"),
+  Population_Mean = c(
+    mean(z$height), 
+    mean(z$weight), 
+    mean(z$age), 
+    mean(z$zombies_killed), 
+    mean(z$years_of_education)
+  ),
+  
+  Population_SD = c(
+    sqrt(sum((z$height - mean(z$height))^2) / length(z$height)),
+    sqrt(sum((z$weight - mean(z$weight))^2) / length(z$weight)),
+    sqrt(sum((z$age - mean(z$age))^2) / length(z$age)),
+    sqrt(sum((z$zombies_killed - mean(z$zombies_killed))^2) / length(z$zombies_killed)),
+    sqrt(sum((z$years_of_education - mean(z$years_of_education))^2) / length(z$years_of_education))
+  )
+)
+
+popn_stats 
+
+
+#Step 3
+
+library(ggplot2)
+install.packages("ggplot2")
+
+variables <- c("height", "weight", "age", "zombies_killed", "years_of_education")
+
+#creating boxplot by gender for each variable 
+
+variables <- c("height", "weight", "age", "zombies_killed", "years_of_education")
+
+for (var in variables) {
+  Bplot<- ggplot(z, aes(x = gender, y = .data[[var]], fill = gender)) +
+    geom_boxplot() +
+    labs(title = paste("Boxplot of", var, "by Gender"),
+         x = "Gender",
+         y = var) +
+    theme_minimal() 
+    
+    print(Bplot)
+}
+
+
+#Step 4
+
+# Scatterplot of Height vs Age
+
+ggplot(z, aes(x = age, y = height, color = gender)) +
+  geom_point(alpha = 0.6) +
+  labs(title = "Height vs. Age by Gender",
+       x = "Age",
+       y = "Height") +
+  theme_minimal()
+
+
+# Scatterplot of Weight vs Age
+ggplot(z, aes(x = age, y = weight, color = gender)) +
+  geom_point(alpha = 0.6) +
+  labs(title = "Weight vs. Age by Gender",
+       x = "Age",
+       y = "Weight") +
+  theme_minimal()
+
+Answer: 
+  
+  
+  
+  
+  
+#Step 5
+
+# Histogram
+for (var in variables) {
+  
+  p1 <- ggplot(z, aes(x = .data[[var]])) +
+    geom_histogram(bins = 10, fill = "blue", color = "black", alpha = 0.4) +
+    labs(title = paste("Histogram of", var),
+         x = var,
+         y = "Count") +
+    theme_minimal()
+  
+  p1
+  
+# Q-Q Plot
+  p2 <- ggplot(z, aes(sample = .data[[var]])) +
+    geom_qq() +
+    geom_qq_line() +
+    labs(title = paste("Q-Q Plot of", var)) +
+    theme_minimal()
+  
+  p2
+}
+
+p1
+p2
+
+
+
+#Step 6
+
+library(purrr)
+
+ #sample size
+n <- 50
+
+set.seed(123)
+sample_data<- slice_sample(z, n=50)
+
+# Function to compute statistics for each variable
+
+#variables
+variables <- c("height", "weight", "age", "zombies_killed", "years_of_education")
+
+Stats <- function(var) {
+  data <- sample_data[[var]]
+  n <- length(data)
+  
+  mean_val <- mean(data)
+  sd_val <- sd(data)
+  se_val <- sd_val / sqrt(n)
+  t_critical <- qt(0.975, df = n-1)
+  ci_lower <- mean_val - (t_critical * se_val)
+  ci_upper <- mean_val + (t_critical * se_val)
+   tibble(
+    variable = var,
+    mean = mean_val,
+    sd = sd_val,
+    se = se_val,
+    ci_lower = ci_lower,
+    ci_upper = ci_upper
+  )
+}
+  
+ results <- map_dfr(variables, Stats)
+  
+ print(results)
+ 
+ 
+ 
+ #Step 7
+ 
+ 
+ #reproducibility
+set.seed(123)
+
+# Draw 199 additional random samples of size 50 from the population
+sample_means <- map_dfr(1:200, ~{
+  sample_data <- slice_sample(z, n = 50)
+  tibble(
+    height_mean = mean(sample_data$height),
+    weight_mean = mean(sample_data$weight),
+    age_mean = mean(sample_data$age),
+    zombies_mean = mean(sample_data$zombies),
+    education_mean = mean(sample_data$education)
+  )
+})
+ 
+head(sample_means)
+
+# Calculate the means and standard deviations of the sampling distribution
+
+sample_distribution_stats <- sample_means |>
+  summarise(
+    height_mean = mean(height_mean),
+    weight_mean = mean(weight_mean),
+    age_mean = mean(age_mean),
+    zombies_mean = mean(zombies_mean),
+    education_mean = mean(education_mean),
+    
+    height_sd = sd(height_mean),
+    weight_sd = sd(weight_mean),
+    age_sd = sd(age_mean),
+    zombies_sd = sd(zombies_mean),
+    education_sd = sd(education_mean)
+  )
+
+
+sample_distribution_stats
+
+
+# Compare the standard deviation of the sampling distribution to the standard error
+comparison <- tibble(
+  variable = c("Height", "Weight", "Age", "Zombies", "Education"),
+  sampling_sd = c(
+    sample_distribution_stats$height_sd,
+    sample_distribution_stats$weight_sd,
+    sample_distribution_stats$age_sd,
+    sample_distribution_stats$zombies_sd,
+    sample_distribution_stats$education_sd
+  ),
+  standard_error = c(
+    sample_first_se$height_se,
+    sample_first_se$weight_se,
+    sample_first_se$age_se,
+    sample_first_se$zombies_se,
+    sample_first_se$education_se
+  )
+)
+
+comparison
+
+
+#Step 8
+
+Answer
+
+
+#Step 9
+
+# Compute 95% Confidence Intervals using the 2.5% and 97.5% quantiles for each variable
+conf_intervals <- sample_means |>
+  summarise(
+    height_ci_lower = quantile(height_mean, 0.025),
+    height_ci_upper = quantile(height_mean, 0.975),
+    
+    weight_ci_lower = quantile(weight_mean, 0.025),
+    weight_ci_upper = quantile(weight_mean, 0.975),
+    
+    age_ci_lower = quantile(age_mean, 0.025),
+    age_ci_upper = quantile(age_mean, 0.975),
+    
+    zombies_ci_lower = quantile(zombies_mean, 0.025),
+    zombies_ci_upper = quantile(zombies_mean, 0.975),
+    
+    education_ci_lower = quantile(education_mean, 0.025),
+    education_ci_upper = quantile(education_mean, 0.975)
+  )
+
+print(conf_intervals)
+
+
+# Calculate the 95% CI directly from the sampling distribution 
+ci_sampling_distribution <- tibble(
+  variable = c("Height", "Weight", "Age", "Zombies", "Education"),
+  ci_lower = c(
+    quantile(sample_means$height_mean, 0.025),
+    quantile(sample_means$weight_mean, 0.025),
+    quantile(sample_means$age_mean, 0.025),
+    quantile(sample_means$zombies_mean, 0.025),
+    quantile(sample_means$education_mean, 0.025)
+  ),
+  ci_upper = c(
+    quantile(sample_means$height_mean, 0.975),
+    quantile(sample_means$weight_mean, 0.975),
+    quantile(sample_means$age_mean, 0.975),
+    quantile(sample_means$zombies_mean, 0.975),
+    quantile(sample_means$education_mean, 0.975)
+  )
+)
+
+# Print the CI from sampling distribution
+print(ci_sampling_distribution)
+
+# Calculate the CI using the first sample and its standard error
+ci_sample_first <- tibble(
+  variable = c("Height", "Weight", "Age", "Zombies", "Education"),
+  ci_lower = c(
+    sample_first_mean$height - 1.96 * sample_first_se$height_se,
+    sample_first_mean$weight - 1.96 * sample_first_se$weight_se,
+    sample_first_mean$age - 1.96 * sample_first_se$age_se,
+    sample_first_mean$zombies - 1.96 * sample_first_se$zombies_se,
+    sample_first_mean$education - 1.96 * sample_first_se$education_se
+  ),
+  ci_upper = c(
+    sample_first_mean$height + 1.96 * sample_first_se$height_se,
+    sample_first_mean$weight + 1.96 * sample_first_se$weight_se,
+    sample_first_mean$age + 1.96 * sample_first_se$age_se,
+    sample_first_mean$zombies + 1.96 * sample_first_se$zombies_se,
+    sample_first_mean$education + 1.96 * sample_first_se$education_se
+  )
+)
+
+# Print the CI based on the first sample
+print(ci_sample_first)
+
+# Calculate the CI using the standard error of the sampling distribution
+se_sampling_distribution <- tibble(
+  height_se = sd(sample_means$height_mean),
+  weight_se = sd(sample_means$weight_mean),
+  age_se = sd(sample_means$age_mean),
+  zombies_se = sd(sample_means$zombies_mean),
+  education_se = sd(sample_means$education_mean)
+)
+
+ci_se_sampling_distribution <- tibble(
+  variable = c("Height", "Weight", "Age", "Zombies", "Education"),
+  ci_lower = c(
+    mean(sample_means$height_mean) - 1.96 * se_sampling_distribution$height_se,
+    mean(sample_means$weight_mean) - 1.96 * se_sampling_distribution$weight_se,
+    mean(sample_means$age_mean) - 1.96 * se_sampling_distribution$age_se,
+    mean(sample_means$zombies_mean) - 1.96 * se_sampling_distribution$zombies_se,
+    mean(sample_means$education_mean) - 1.96 * se_sampling_distribution$education_se
+  ),
+  ci_upper = c(
+    mean(sample_means$height_mean) + 1.96 * se_sampling_distribution$height_se,
+    mean(sample_means$weight_mean) + 1.96 * se_sampling_distribution$weight_se,
+    mean(sample_means$age_mean) + 1.96 * se_sampling_distribution$age_se,
+    mean(sample_means$zombies_mean) + 1.96 * se_sampling_distribution$zombies_se,
+    mean(sample_means$education_mean) + 1.96 * se_sampling_distribution$education_se
+  )
+)
+
+# Print the CI using the standard error of the sampling distribution
+print(ci_se_sampling_distribution)
+
+# Combine all three methods of CI
+ci_comparison <- bind_rows(
+  mutate(ci_sample_first, method = "CI based on one sample"),
+  mutate(ci_sampling_distribution, method = "CI based on sampling distribution"),
+  mutate(ci_se_sampling_distribution, method = "CI based on SE of sampling distribution")
+)
+
+# Print CI comparisons
+print(ci_comparison)
+
+#The confidence intervals derived from the sampling distribution and standard error are more reliable than the one based on a single sample.
+
+
+#Step 10
+# number of bootstrap samples
+n_boot<- 1000
+
+bootstrap_samples <- map_dfr(1:n_boot, ~{
+  bootstrap_sample <- slice_sample(z, n = 50, replace = TRUE)
+  tibble(
+    height_mean = mean(bootstrap_sample$height),
+    weight_mean = mean(bootstrap_sample$weight),
+    age_mean = mean(bootstrap_sample$age),
+    zombies_mean = mean(bootstrap_sample$zombies),
+    education_mean = mean(bootstrap_sample$education)
+  )
+})
+
+# Calculate 2.5% and 97.5% percentiles for the 95% CI
+bootstrap_ci <- bootstrap_samples %>%
+  summarise(
+    height_ci_lower = quantile(height_mean, 0.025),
+    height_ci_upper = quantile(height_mean, 0.975),
+    
+    weight_ci_lower = quantile(weight_mean, 0.025),
+    weight_ci_upper = quantile(weight_mean, 0.975),
+    
+    age_ci_lower = quantile(age_mean, 0.025),
+    age_ci_upper = quantile(age_mean, 0.975),
+    
+    zombies_ci_lower = quantile(zombies_mean, 0.025),
+    zombies_ci_upper = quantile(zombies_mean, 0.975),
+    
+    education_ci_lower = quantile(education_mean, 0.025),
+    education_ci_upper = quantile(education_mean, 0.975)
+  )
+
+# Print the bootstrapped 95% confidence intervals
+print(bootstrap_ci)
+
+
+
+#Bootstrapping generates a 95% CI by resampling 1000 samples from the original data and calculating the 2.5th and 97.5th percentiles. Compared to simulated CIs, bootstrapping is more robust for non-normal data. It offers a more empirical, data-driven estimate, whereas the simulated CI and standard error assume normality.
+
+
+
+
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
